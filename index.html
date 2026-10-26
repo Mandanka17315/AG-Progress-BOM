@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOM RE Progress Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f5f7; --surface:#ffffff; --surface-2:#f8f9fb; --border:#d9dde3; --border-strong:#b8bec7;
+  --text:#14171c; --text-2:#4b525c; --muted:#7a818b;
+  --brand:#0b4f8a; --brand-ink:#ffffff; --head:#e6eef7; --head-2:#f0f4f9;
+  --div-row:#fff6e0; --circle-row:#0b4f8a; --circle-ink:#ffffff;
+  --good-bg:#e3f4e6; --good:#1d6b2a; --warn-bg:#fff1d6; --warn:#8a5a00; --bad-bg:#fde5e4; --bad:#a3221f;
+  --s1:#2a78d6; --s2:#eb6834; --neutral:#aab1bb; --grid:#e8eaee;
+  --link:#0b5cad;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121315; --surface:#1a1b1e; --surface-2:#202226; --border:#33363c; --border-strong:#4a4e56;
+    --text:#eceef1; --text-2:#c0c4cb; --muted:#8d939c;
+    --brand:#3d86cc; --brand-ink:#ffffff; --head:#1f2a37; --head-2:#232c38;
+    --div-row:#2d2717; --circle-row:#1d4f80; --circle-ink:#ffffff;
+    --good-bg:#16301b; --good:#7fd28e; --warn-bg:#33290f; --warn:#f0c060; --bad-bg:#3a1817; --bad:#f19a97;
+    --s1:#3987e5; --s2:#d95926; --neutral:#5d636c; --grid:#2a2d32; --link:#7ab8f5;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121315; --surface:#1a1b1e; --surface-2:#202226; --border:#33363c; --border-strong:#4a4e56;
+  --text:#eceef1; --text-2:#c0c4cb; --muted:#8d939c;
+  --brand:#3d86cc; --brand-ink:#ffffff; --head:#1f2a37; --head-2:#232c38;
+  --div-row:#2d2717; --circle-row:#1d4f80; --circle-ink:#ffffff;
+  --good-bg:#16301b; --good:#7fd28e; --warn-bg:#33290f; --warn:#f0c060; --bad-bg:#3a1817; --bad:#f19a97;
+  --s1:#3987e5; --s2:#d95926; --neutral:#5d636c; --grid:#2a2d32; --link:#7ab8f5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+header.top{background:var(--brand);color:var(--brand-ink);padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+header.top h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.2px}
+header.top .sub{font-size:12px;opacity:.85}
+.controls{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-end;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+.controls label{display:flex;flex-direction:column;font-size:11px;color:var(--text-2);gap:3px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+select,input[type=date],input[type=month],input[type=text],input[type=number]{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);color:var(--text)}
+button{font:inherit;font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);cursor:pointer}
+button:hover{border-color:var(--brand)}
+button.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.spacer{flex:1}
+#status{font-size:12px;color:var(--text-2);padding:6px 16px;background:var(--surface-2);border-bottom:1px solid var(--border);min-height:28px}
+#status.err{color:var(--bad);background:var(--bad-bg)}
+nav.tabs{display:flex;gap:2px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto}
+nav.tabs button{border:none;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 12px;white-space:nowrap;color:var(--text-2);font-weight:600}
+nav.tabs button.on{color:var(--brand);border-bottom-color:var(--brand)}
+main{padding:16px;max-width:1500px;margin:0 auto}
+.panel{display:none}.panel.on{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px}
+.card h2{font-size:15px;margin:0 0 4px}
+.card .note{font-size:12px;color:var(--muted);margin:0 0 10px}
+.cardhead{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.tile .k{font-size:12px;color:var(--text-2);font-weight:600}
+.tile .v{font-size:26px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.tile .d{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+.chartbox{position:relative;height:320px}
+.chartbox.tall{height:520px}
+.tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table.rep{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+table.rep th,table.rep td{border:1px solid var(--border);padding:5px 8px;text-align:right;white-space:nowrap}
+table.rep th{background:var(--head);font-weight:600;text-align:center;color:var(--text)}
+table.rep thead tr:nth-child(2) th{background:var(--head-2);font-size:12px}
+table.rep td.l{text-align:left}
+table.rep td.sch{text-align:center;font-weight:600;background:var(--surface-2);white-space:normal;min-width:90px}
+table.rep tr.divt td{background:var(--div-row);font-weight:700}
+table.rep tr.circ td{background:var(--circle-row);color:var(--circle-ink);font-weight:700}
+table.rep tr.circ td.c{color:var(--circle-ink)}
+table.rep tr.wk td{background:var(--surface-2);font-weight:600}
+table.rep td.c{cursor:pointer;color:var(--link);text-decoration:underline dotted;text-underline-offset:3px}
+table.rep td.c:hover{background:var(--head-2)}
+table.rep td.z{color:var(--muted)}
+table.rep td.pg{background:var(--good-bg);color:var(--good);font-weight:600}
+table.rep td.pw{background:var(--warn-bg);color:var(--warn);font-weight:600}
+table.rep td.pb{background:var(--bad-bg);color:var(--bad);font-weight:600}
+table.rep td.neg{color:var(--bad)}
+table.rep th.mon{border-left:2px solid var(--border-strong)}
+table.rep td.mon{border-left:2px solid var(--border-strong)}
+table.tgt input{width:90px;text-align:right}
+.legendrow{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-2);margin:6px 0 0}
+.legendrow span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--sw)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal.on{display:flex}
+.modal .box{background:var(--surface);border-radius:12px;max-width:1200px;width:100%;max-height:90vh;display:flex;flex-direction:column;border:1px solid var(--border)}
+.modal .mh{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.modal .mh h3{margin:0;font-size:15px;flex:1;min-width:200px}
+.modal .mb{overflow:auto;padding:0}
+.modal table.rep td{text-align:left}
+.modal table.rep td.r{text-align:right}
+.drawer .row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.drawer label{display:flex;flex-direction:column;font-size:12px;color:var(--text-2);gap:4px;font-weight:600}
+.drawer input[type=text]{min-width:min(560px,80vw)}
+.hint{font-size:12px;color:var(--muted)}
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:12px}
+@media print{
+  header.top .sub, .controls, nav.tabs, #status, .noprint{display:none!important}
+  body{background:#fff}
+  main{padding:0;max-width:none}
+  .card{border:none;padding:0}
+  table.rep td.c{color:inherit;text-decoration:none}
+  .tblwrap{overflow:visible;border:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>BOM RE Progress Dashboard — Ag Wells</h1>
+    <div class="sub">Baroda O&amp;M Circle · MGVCL · <span id="asOnLbl">—</span></div>
+  </div>
+  <div class="sub" id="srcLbl">No data loaded</div>
+</header>
+
+<div class="controls">
+  <label>Financial year<select id="fySel"></select></label>
+  <label>As on date<input type="date" id="asOn"></label>
+  <label>Compare with (last weekly)<input type="date" id="cmpOn"></label>
+  <label>Paid pending means<select id="ppDef">
+    <option value="work">FQ paid, TMN/WCC not issued</option>
+    <option value="release">FQ paid, not released</option>
+  </select></label>
+  <label>PP schemes<select id="ppSch">
+    <option value="ts">TASP + SPA (incl. DZ)</option>
+    <option value="all">All schemes</option>
+  </select></label>
+  <div class="spacer"></div>
+  <button class="primary" id="btnRefresh" title="Fetch latest data from Google Sheet">⟳ Refresh from Google Sheet</button>
+  <button id="btnFile" title="Load a downloaded .xlsx or .csv instead">Load file…</button>
+  <input type="file" id="fileIn" accept=".xlsx,.xlsm,.xls,.csv,.txt" multiple hidden>
+</div>
+<div id="status">Starting…</div>
+
+<nav class="tabs" id="tabs">
+  <button data-t="ov" class="on">Overview</button>
+  <button data-t="tasp">TASP S/Dn</button>
+  <button data-t="spadz">SPA + DZ S/Dn</button>
+  <button data-t="dz">DZ S/Dn</button>
+  <button data-t="spa">SPA S/Dn</button>
+  <button data-t="pp">PP Monthwise S/Dn</button>
+  <button data-t="cat">CAT Wise Paid Pending</button>
+  <button data-t="wc">WC Status (List)</button>
+  <button data-t="set">Targets &amp; Settings</button>
+</nav>
+
+<main>
+  <section class="panel on" id="p-ov"><div class="empty">Load data to see the dashboard.</div></section>
+  <section class="panel" id="p-tasp"></section>
+  <section class="panel" id="p-spadz"></section>
+  <section class="panel" id="p-dz"></section>
+  <section class="panel" id="p-spa"></section>
+  <section class="panel" id="p-pp"></section>
+  <section class="panel" id="p-cat"></section>
+  <section class="panel" id="p-wc"></section>
+  <section class="panel drawer" id="p-set"></section>
+</main>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <div class="mh">
+      <h3 id="mTitle">Records</h3>
+      <input type="text" id="mSearch" placeholder="Search name, village, SR no…" style="min-width:220px">
+      <button id="mCsv">Download CSV</button>
+      <button id="mClose">Close ✕</button>
+    </div>
+    <div class="mb" id="mBody"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   CONFIGURATION
+   ===================================================================== */
+const DEFAULT_LINK = 'https://docs.google.com/spreadsheets/d/1oxwtWfiEhhTSNdMjCrLPMPOLgD69uLLdAC1RiFYaYRw/edit?gid=629991024#gid=629991024';
+const LS_SET = 'bomre_settings_v1', LS_TGT = 'bomre_targets_v1';
+
+// Division -> ordered sub divisions (labels as used in the Excel dashboard)
+const DIVS = {
+  BARODA:  ['CHHANI','KOYALI','NANDESARI','WAGHODIA','SAVLI','DESAR','MANJUSAR'],
+  JAMBUVA: ['JAMBUVA','KHATMBA','PADRA 1','PADRA 2','MOBHA','KARJAN I','KARJAN II'],
+  DABHOI:  ['DABHOI T','DABHOI R','CHANDOD','SANKHEDA','KOSINDRA','SINOR'],
+  BODELI:  ['BODELI','PAVIJETPUR','TEJGADH',"C'UDEPUR","C'UDEPUR-II",'KAWANT','KAWANT-II','NASWADI']
+};
+const DIV_ORDER = ['BARODA','JAMBUVA','DABHOI','BODELI'];
+const DIV_NAME = {BARODA:'Baroda',JAMBUVA:'Jambuva',DABHOI:'Dabhoi',BODELI:'Bodeli'};
+const SD_DIV = {}; for (const d in DIVS) for (const s of DIVS[d]) SD_DIV[s] = d;
+
+// Portal sub-division name -> dashboard label (order matters: specific before general)
+const SD_MATCH = [
+  [/KOY/,'KOYALI'],[/CHHANI/,'CHHANI'],[/NANDES/,'NANDESARI'],[/WAGHOD/,'WAGHODIA'],[/SAVLI/,'SAVLI'],[/DESAR/,'DESAR'],[/MANJUS/,'MANJUSAR'],
+  [/KHAT/,'KHATMBA'],[/PADA?RA\s*(II|2)\b/,'PADRA 2'],[/PADA?RA/,'PADRA 1'],[/KARJAN\s*(II|2)\b/,'KARJAN II'],[/KARJAN/,'KARJAN I'],[/MOBHA/,'MOBHA'],[/JAMBUVA/,'JAMBUVA'],
+  [/DABHOI\s*(T|TOWN|U|URBAN)\b/,'DABHOI T'],[/DABHOI/,'DABHOI R'],[/CHANDOD/,'CHANDOD'],[/SANKHEDA/,'SANKHEDA'],[/KOSINDRA/,'KOSINDRA'],[/SINOR/,'SINOR'],
+  [/BODELI/,'BODELI'],[/PAVI|JETPUR/,'PAVIJETPUR'],[/TEJGADH/,'TEJGADH'],
+  [/(CHHOTA\s*U?DEPUR|CHHOTAUDEPUR|UDEPUR)\s*(II|2)\b/,"C'UDEPUR-II"],[/CHHOTA|UDEPUR/,"C'UDEPUR"],
+  [/KAWANT\s*(II|2)\b/,'KAWANT-II'],[/KAWANT/,'KAWANT'],[/NASWADI/,'NASWADI']
+];
+const DIV_MATCH = [[/BARODA|VADODARA/,'BARODA'],[/JAMBUVA/,'JAMBUVA'],[/DABHOI/,'DABHOI'],[/BODELI/,'BODELI']];
+
+// Progress reports (layout follows the Excel sheets)
+const REPORTS = {
+  tasp:  {tab:'TASP -SDn', title:'Sub-Division wise Progress for TASP Scheme: Ag Wells', scheme:'TASP Scheme',
+          filter:r=>r.sch==='TASP',
+          groups:[['DABHOI',['SANKHEDA','KOSINDRA']],['BODELI',DIVS.BODELI]]},
+  spadz: {tab:'SPA + DZ SDN', title:'Sub-Division wise Progress for SPA + DZ Scheme: Ag Wells', scheme:'SPA Scheme + DZ Scheme',
+          filter:r=>r.sch==='SPA',
+          groups:[['BARODA',DIVS.BARODA],['JAMBUVA',DIVS.JAMBUVA],['DABHOI',DIVS.DABHOI],['BODELI',['BODELI']]]},
+  dz:    {tab:'DZ SDN', title:'Sub-Division wise Progress for DZ (Dark Zone) Scheme: Ag Wells', scheme:'DZ Scheme',
+          filter:r=>r.dz,
+          groups:[['BARODA',['CHHANI','KOYALI','NANDESARI','WAGHODIA']],['JAMBUVA',['JAMBUVA','KHATMBA','PADRA 1','PADRA 2']]]},
+  spa:   {tab:'SPA SDN', title:'Sub-Division wise Progress for SPA Scheme (excluding DZ): Ag Wells', scheme:'SPA Scheme',
+          filter:r=>r.sch==='SPA' && !r.dz,
+          groups:[['BARODA',['CHHANI','WAGHODIA','SAVLI','DESAR','MANJUSAR']],['JAMBUVA',DIVS.JAMBUVA],['DABHOI',DIVS.DABHOI],['BODELI',['BODELI']]]}
+};
+// Default targets copied from AG_Progress_Dashboard.xlsm  [Phy, Fin (Lakh)]
+const DEFAULT_TARGETS = {
+  tasp:{SANKHEDA:[10,22.962745],KOSINDRA:[50,123.924658],BODELI:[98,151.212737],PAVIJETPUR:[480,556.867189],TEJGADH:[1057,985.255784],"C'UDEPUR":[428,478.859744],KAWANT:[386,812.1124],NASWADI:[541,1168.802993]},
+  spadz:{CHHANI:[36,52.77],KOYALI:[3,4.48],NANDESARI:[9,15.45],WAGHODIA:[61,127.66],SAVLI:[88,126.95],DESAR:[108,182.98],MANJUSAR:[23,32.97],
+         JAMBUVA:[28,63.64],KHATMBA:[24,41.42],'PADRA 1':[6,13.49],'PADRA 2':[17,21.06],MOBHA:[29,50.88],'KARJAN I':[42,93.54],'KARJAN II':[25,50.84],
+         'DABHOI T':[0,0],'DABHOI R':[50,73.62],CHANDOD:[10,17.12],SANKHEDA:[35,56.55],KOSINDRA:[3,6.99],SINOR:[29,41.15],BODELI:[24,26.44]},
+  dz:{},
+  spa:{CHHANI:[16,27.98],WAGHODIA:[153,275.42],SAVLI:[134,238.52],DESAR:[147,260.52],MANJUSAR:[33,59.37],
+       JAMBUVA:[3,6.25],KHATMBA:[22,39.08],'PADRA 1':[17,30.05],'PADRA 2':[17,27.96],MOBHA:[73,130.76],'KARJAN I':[71,127.41],'KARJAN II':[39,69.72],
+       'DABHOI T':[0,0],'DABHOI R':[116,206.93],CHANDOD:[34,62.45],SANKHEDA:[54,95.45],KOSINDRA:[4,6.63],SINOR:[77,137.48],BODELI:[10,18.02]}
+};
+
+/* =====================================================================
+   STATE / STORAGE
+   ===================================================================== */
+const S = { recs:[], list:[], source:'', maxDay:null, unmatched:{} };
+let settings = load(LS_SET) || {};
+settings.link = settings.link || DEFAULT_LINK;
+settings.link2 = settings.link2 || '';
+settings.ppStart = settings.ppStart || '';
+let targets = load(LS_TGT) || JSON.parse(JSON.stringify(DEFAULT_TARGETS));
+for (const k in DEFAULT_TARGETS) if (!targets[k]) targets[k] = {};
+function load(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* =====================================================================
+   DATE HELPERS  (dates are stored as integer day numbers, UTC epoch days)
+   ===================================================================== */
+const MON = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const MON_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let SLASH_DMY = false;
+const dayOf = (y,m,d) => Math.floor(Date.UTC(y,m,d)/864e5);
+function toDay(v){
+  if (v==null) return null;
+  if (typeof v === 'number') return (v>20000 && v<80000) ? Math.floor(v) - 25569 : null;
+  if (v instanceof Date) return isNaN(v) ? null : dayOf(v.getFullYear(), v.getMonth(), v.getDate());
+  v = String(v).trim();
+  if (!v || v==='NULL' || v==='#N/A' || v==='-') return null;
+  let m;
+  if ((m = /^(\d{5})(\.\d+)?$/.exec(v))) { const n=+m[1]; return (n>20000&&n<80000) ? n-25569 : null; }
+  if ((m = /^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/.exec(v))) {
+    let a=+m[1], b=+m[2]; const [mm,dd] = SLASH_DMY ? [b,a] : [a,b];
+    return dayOf(+m[3], mm-1, dd);
+  }
+  if ((m = /^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]*(\d{2,4})/.exec(v))) {
+    const mo = MON[m[2].toLowerCase()]; if (mo==null) return null;
+    let y = +m[3]; if (y<100) y += 2000; return dayOf(y, mo, +m[1]);
+  }
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(v))) return dayOf(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+function detectSlashOrder(rows, cols){
+  // if any slash date has first part > 12 the sheet uses D/M/Y
+  let dmy=false, mdy=false;
+  for (let i=0;i<rows.length && i<30000;i++) for (const c of cols){
+    const v = rows[i][c]; if (typeof v!=='string') continue;
+    const m = /^(\d{1,2})\/(\d{1,2})\/\d{4}/.exec(v); if (!m) continue;
+    if (+m[1]>12) dmy=true; if (+m[2]>12) mdy=true;
+  }
+  return dmy && !mdy;
+}
+const dObj = d => new Date(d*864e5);
+const fmtD = d => { if (d==null) return ''; const x=dObj(d); return String(x.getUTCDate()).padStart(2,'0')+'-'+String(x.getUTCMonth()+1).padStart(2,'0')+'-'+x.getUTCFullYear(); };
+const fmtDot = d => { const x=dObj(d); return String(x.getUTCDate()).padStart(2,'0')+'.'+String(x.getUTCMonth()+1).padStart(2,'0')+'.'+String(x.getUTCFullYear()).slice(2); };
+const isoD = d => dObj(d).toISOString().slice(0,10);
+const fromIso = s => { const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||''); return m ? dayOf(+m[1],+m[2]-1,+m[3]) : null; };
+const monKey = d => { const x=dObj(d); return x.getUTCFullYear()*12 + x.getUTCMonth(); };
+const monLbl = k => MON_S[k%12] + '-' + String(Math.floor(k/12)).slice(2);
+const todayDay = () => { const t=new Date(); return dayOf(t.getFullYear(), t.getMonth(), t.getDate()); };
+const fyOf = d => { const x=dObj(d); return x.getUTCMonth()>=3 ? x.getUTCFullYear() : x.getUTCFullYear()-1; };
+
+/* =====================================================================
+   PARSING
+   ===================================================================== */
+function parseCSV(t){
+  const rows=[]; let row=[], i=0; const n=t.length;
+  if (t.charCodeAt(0)===0xFEFF) i=1;
+  while (i<n){
+    let c=t.charCodeAt(i);
+    if (c===34){ // quoted
+      let f=''; i++;
+      while (i<n){
+        const j=t.indexOf('"',i); if (j<0){ f+=t.slice(i); i=n; break; }
+        f+=t.slice(i,j); i=j+1;
+        if (t.charCodeAt(i)===34){ f+='"'; i++; } else break;
+      }
+      row.push(f); c=t.charCodeAt(i);
+      if (c===44){ i++; if (i>=n) row.push(''); } else if (c===13||c===10){ rows.push(row); row=[]; i+= (c===13&&t.charCodeAt(i+1)===10)?2:1; }
+      continue;
+    }
+    let j=i; while (j<n){ const k=t.charCodeAt(j); if (k===44||k===10||k===13) break; j++; }
+    row.push(t.slice(i,j)); c=t.charCodeAt(j);
+    if (c===44){ i=j+1; if (i>=n) row.push(''); }
+    else { rows.push(row); row=[]; i = j + ((c===13&&t.charCodeAt(j+1)===10)?2:1); }
+  }
+  if (row.length) rows.push(row);
+  return rows;
+}
+const normH = h => String(h==null?'':h).toLowerCase().replace(/[^a-z0-9]/g,'');
+const ALIAS = {
+  sr:['srnumber','srno'], div:['nameofdivision','division'], sd:['nameofsubdivision','subdivision'],
+  name:['nameofapplicant','consumername','applicantname'], village:['villageorcity','village'], taluka:['taluka'],
+  scheme:['nameofscheme','scheme'], gpr:['gprpprcategory'], cat:['surveycategory','category'],
+  ts:['tsamount','tsvalue'], paid:['dateoffqpaid','fqpaiddate'], tmn:['dateoftmnissued','tmnissuedate'],
+  wcc:['dateofwcc'], rel:['dateofreleaseconn','releasedate','dateofrelease'], status:['srstatus'],
+  wcs:['wcstatus'], load:['demandload','load'], trp:['dateoftrrecv','trpaid']
+};
+function colMap(header){
+  const H = header.map(normH), m = {};
+  for (const k in ALIAS){ for (const a of ALIAS[k]){ const i=H.indexOf(a); if (i>=0){ m[k]=i; break; } } }
+  return m;
+}
+// Identify a sheet from its header row: 'gpr' (GPR All export) or 'list' (List sheet)
+function classify(rows){
+  for (let h=0; h<Math.min(6,rows.length); h++){
+    const H = rows[h].map(normH);
+    if (H.includes('dateofreleaseconn') && H.includes('nameofsubdivision')) return {type:'gpr', h};
+    if (H.includes('wcstatus') && H.includes('nameofsubdivision')) return {type:'list', h};
+  }
+  return null;
+}
+function normSd(raw){
+  const u = String(raw||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+  for (const [re,k] of SD_MATCH) if (re.test(u)) return k;
+  return null;
+}
+function normDiv(raw){
+  const u = String(raw||'').toUpperCase();
+  for (const [re,k] of DIV_MATCH) if (re.test(u)) return k;
+  return null;
+}
+function buildRecords(rows, cls){
+  const m = colMap(rows[cls.h]); const body = rows.slice(cls.h+1);
+  SLASH_DMY = detectSlashOrder(body, ['paid','rel','tmn','wcc'].filter(k=>m[k]!=null).map(k=>m[k]));
+  const out=[], g = (r,k) => m[k]==null ? '' : r[m[k]];
+  const unmatched = {};
+  for (const r of body){
+    if (!r || r.length<3) continue;
+    const sdRaw = g(r,'sd'); if (!sdRaw || sdRaw==='#N/A') { if (!g(r,'sr')) continue; }
+    let sd = normSd(sdRaw);
+    let div = sd ? SD_DIV[sd] : normDiv(g(r,'div'));
+    if (!sd){ sd = String(sdRaw||'(blank)').trim().toUpperCase(); unmatched[sd]=(unmatched[sd]||0)+1; }
+    if (!div) div = 'OTHER';
+    const schRaw = String(g(r,'scheme')||'').toUpperCase(), gpr = String(g(r,'gpr')||'').toUpperCase();
+    const sch = /TASP/.test(schRaw) ? 'TASP' : /SPA/.test(schRaw) ? 'SPA' : (schRaw.replace(/\s*SCHEMES?$/,'') || 'OTHER');
+    let cat = String(g(r,'cat')||'').trim().toUpperCase(); if (!['A','B','C','D'].includes(cat)) cat='';
+    const tsv = parseFloat(String(g(r,'ts')).replace(/,/g,''));
+    const tmn = toDay(g(r,'tmn')), wcc = toDay(g(r,'wcc')), rel = toDay(g(r,'rel'));
+    out.push({
+      sr: g(r,'sr'), sdRaw, sd, div, name: g(r,'name'), village: g(r,'village'),
+      schRaw, sch, dz: /DARK/.test(gpr) || /\bDZ\b|DARK/.test(schRaw), cat,
+      ts: isFinite(tsv) ? tsv : 0, paid: toDay(g(r,'paid')), tmn, wcc, rel,
+      wdone: [tmn,wcc,rel].filter(x=>x!=null).reduce((a,b)=>a==null?b:Math.min(a,b), null),
+      wcs: g(r,'wcs')
+    });
+  }
+  return {recs:out, unmatched};
+}
+function ingest(sheets, sourceLbl){
+  // sheets: array of {name, rows}
+  let gpr=null, list=null;
+  for (const sh of sheets){
+    const c = classify(sh.rows); if (!c) continue;
+    if (c.type==='gpr' && !gpr) gpr = {sh, c};
+    if (c.type==='list' && !list) list = {sh, c};
+  }
+  if (!gpr && !list) throw new Error('Could not find the "GPR All" or "List" sheet (header row with "Date Of Release Conn" / "WC Status") in the data.');
+  S.list = list ? buildRecords(list.sh.rows, list.c).recs : [];
+  if (gpr){ const b = buildRecords(gpr.sh.rows, gpr.c); S.recs=b.recs; S.unmatched=b.unmatched; S.base='GPR All'; }
+  else { const b = buildRecords(list.sh.rows, list.c); S.recs=b.recs; S.unmatched=b.unmatched; S.base='List'; }
+  let mx=null; for (const r of S.recs){ for (const d of [r.rel,r.paid,r.tmn]) if (d!=null && (mx==null||d>mx) && d<=todayDay()+1) mx=d; }
+  S.maxDay = mx;
+  S.source = sourceLbl + ' · base sheet: ' + S.base + ' (' + S.recs.length.toLocaleString('en-IN') + ' rows)' + (S.list.length ? ' · List: '+S.list.length.toLocaleString('en-IN')+' rows' : '');
+  S.loadedAt = new Date();
+  initControls(); renderAll();
+}
+
+/* =====================================================================
+   LOADING (Google Sheet / local file)
+   ===================================================================== */
+function parseLink(s){
+  s = String(s||'').trim(); if (!s) return null;
+  let m;
+  if ((m = /\/spreadsheets\/d\/e\/([\w-]+)/.exec(s))) { const g=/gid=(\d+)/.exec(s); return {pub:m[1], gid:g?g[1]:null, raw:s}; }
+  if ((m = /\/spreadsheets\/d\/([\w-]+)/.exec(s))) { const g=/gid=(\d+)/.exec(s); return {id:m[1], gid:g?g[1]:null, raw:s}; }
+  if (/^[\w-]{30,}$/.test(s)) return {id:s, gid:null, raw:s};
+  if (/^https?:/.test(s)) return {url:s, raw:s};
+  return null;
+}
+async function fetchBuf(url){ const r = await fetch(url, {cache:'no-store', redirect:'follow'}); if (!r.ok) throw new Error('HTTP '+r.status); return r; }
+function readWorkbook(buf){
+  const wb = XLSX.read(buf, {type:'array', dense:true});
+  return wb.SheetNames.map(n => ({name:n, rows: XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:''})}));
+}
+async function loadFromGoogle(){
+  const L = [parseLink(settings.link), parseLink(settings.link2)].filter(Boolean);
+  if (!L.length){ setStatus('Add your Google Sheet link under "Targets & Settings".', true); return; }
+  setStatus('Fetching data from Google Sheet… (large sheets can take 10–30 seconds)');
+  const errs = [];
+  // 1) whole workbook as .xlsx — all tabs in one go, no tab IDs needed
+  const p = L[0];
+  if (p.id || p.pub){
+    try{
+      const url = p.id ? `https://docs.google.com/spreadsheets/d/${p.id}/export?format=xlsx` : `https://docs.google.com/spreadsheets/d/e/${p.pub}/pub?output=xlsx`;
+      const r = await fetchBuf(url); const buf = await r.arrayBuffer();
+      if (buf.byteLength < 200) throw new Error('empty response');
+      setStatus('Reading workbook…'); await tick();
+      const sheets = readWorkbook(buf);
+      ingest(sheets, 'Google Sheet (all tabs)'); setStatus(okMsg()); return;
+    }catch(e){ errs.push('Workbook download: '+e.message); }
+  }
+  // 2) each link as CSV of its tab
+  const sheets=[];
+  for (const q of L){
+    let urls=[];
+    if (q.id) urls = [`https://docs.google.com/spreadsheets/d/${q.id}/export?format=csv${q.gid?'&gid='+q.gid:''}`];
+    else if (q.pub) urls = [`https://docs.google.com/spreadsheets/d/e/${q.pub}/pub?output=csv${q.gid?'&gid='+q.gid:''}`];
+    else if (q.url) urls = [q.url];
+    for (const u of urls){
+      try{ const r = await fetchBuf(u); const t = await r.text(); if (/^\s*</.test(t)) throw new Error('got a web page, not CSV (sheet not shared?)'); sheets.push({name:u, rows:parseCSV(t)}); break; }
+      catch(e){ errs.push('CSV '+(q.gid?'gid '+q.gid:'')+': '+e.message); }
+    }
+  }
+  if (sheets.length){
+    try{ ingest(sheets, 'Google Sheet (CSV)'); setStatus(okMsg()); return; }catch(e){ errs.push(e.message); }
+  }
+  setStatus('Could not read the Google Sheet. In Google Sheets: Share → General access → "Anyone with the link" (Viewer), then press Refresh. '+
+    'Alternatively File → Download → Microsoft Excel (.xlsx) and use "Load file…". Details: '+errs.join(' | '), true);
+}
+async function loadFiles(files){
+  try{
+    const sheets=[];
+    for (const f of files){
+      setStatus('Reading '+f.name+'…'); await tick();
+      if (/\.(csv|txt)$/i.test(f.name)){
+        const t = await f.text();
+        if (t.indexOf('## Sheet name:')>=0){ // multi-sheet text export
+          const parts = t.split(/^## Sheet name:\s*/m).slice(1);
+          for (const p of parts){ const nl=p.indexOf('\n'); sheets.push({name:p.slice(0,nl).trim(), rows:parseCSV(p.slice(nl+1).trim())}); }
+        } else sheets.push({name:f.name, rows:parseCSV(t)});
+      } else sheets.push(...readWorkbook(await f.arrayBuffer()));
+    }
+    ingest(sheets, 'File: '+[...files].map(f=>f.name).join(', ')); setStatus(okMsg());
+  }catch(e){ setStatus('Could not read file: '+e.message, true); console.error(e); }
+}
+const tick = () => new Promise(r=>setTimeout(r,20));
+function okMsg(){
+  const um = Object.keys(S.unmatched);
+  return 'Loaded ' + S.recs.length.toLocaleString('en-IN') + ' applications at ' + S.loadedAt.toLocaleTimeString() +
+    (S.maxDay!=null ? ' · latest entry in data: ' + fmtD(S.maxDay) : '') +
+    (um.length ? ' · Unrecognised sub divisions shown as extra rows: ' + um.join(', ') : '');
+}
+function setStatus(msg, err){ const el=$('status'); el.textContent=msg; el.className = err?'err':''; }
+
+/* =====================================================================
+   CONTROLS
+   ===================================================================== */
+function initControls(){
+  const today = todayDay();
+  const fyNow = fyOf(today);
+  let minFy = fyNow; for (const r of S.recs) if (r.rel!=null){ const f=fyOf(r.rel); if (f<minFy && f>=fyNow-6) minFy=f; }
+  const sel = $('fySel'), cur = sel.value;
+  sel.innerHTML = '';
+  for (let y=fyNow; y>=minFy; y--){ const o=document.createElement('option'); o.value=y; o.textContent='FY '+y+'-'+String(y+1).slice(2); sel.appendChild(o); }
+  sel.value = cur && [...sel.options].some(o=>o.value===cur) ? cur : fyNow;
+  if (!$('asOn').value) $('asOn').value = isoD(today);
+  if (!$('cmpOn').value) $('cmpOn').value = isoD(fromIso($('asOn').value) - 7);
+}
+function params(){
+  const fy = +$('fySel').value;
+  const fyS = dayOf(fy,3,1), fyE = dayOf(fy+1,2,31);
+  const asOn = fromIso($('asOn').value) ?? todayDay();
+  let cmp = fromIso($('cmpOn').value); if (cmp==null) cmp = asOn-7;
+  const end = Math.min(fyE, asOn);
+  return {fy, fyS, fyE, asOn, cmp, end, fyLbl:'FY '+fy+'-'+String(fy+1).slice(2), ppDef:$('ppDef').value, ppSch:$('ppSch').value};
+}
+
+/* =====================================================================
+   CALCULATIONS
+   ===================================================================== */
+const CELLS = []; // drill-down store
+function cell(recs, title){ CELLS.push({recs, title}); return CELLS.length-1; }
+const sumTs = a => a.reduce((s,r)=>s+r.ts,0)/1e5;
+const released = (r,a,b) => r.rel!=null && r.rel>=a && r.rel<=b;
+function ppEnd(r, def){ return def==='release' ? r.rel : r.wdone; }
+function isPP(r, d, P){ // pending as of day d
+  if (r.paid==null || r.paid>d) return false;
+  const e = ppEnd(r, P.ppDef); if (e!=null && e<=d) return false;
+  if (P.ppSch==='ts' && r.sch!=='TASP' && r.sch!=='SPA') return false;
+  return true;
+}
+// Ordered rows for a report: [{div, label, sds:[...]}] — adds any sub division with data that is not in the template
+function layout(def, recs){
+  const groups = def.groups.map(([d,s]) => ({div:d, sds:[...s]}));
+  const have = new Set(); groups.forEach(g=>g.sds.forEach(s=>have.add(g.div+'|'+s)));
+  const extra = {};
+  for (const r of recs){ const k=r.div+'|'+r.sd; if (!have.has(k)){ have.add(k); (extra[r.div]=extra[r.div]||[]).push(r.sd); } }
+  for (const d in extra){
+    let g = groups.find(x=>x.div===d);
+    if (!g){ g={div:d, sds:[]}; groups.push(g); }
+    const order = DIVS[d]||[];
+    for (const s of extra[d]) g.sds.push(s);
+    g.sds.sort((a,b)=>{ const ia=order.indexOf(a), ib=order.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  }
+  groups.sort((a,b)=>{ const ia=DIV_ORDER.indexOf(a.div), ib=DIV_ORDER.indexOf(b.div); return (ia<0?99:ia)-(ib<0?99:ib); });
+  return groups;
+}
+function computeReport(key, P){
+  const def = REPORTS[key];
+  const base = S.recs.filter(def.filter);
+  const inFy = base.filter(r=>released(r, P.fyS, P.end));
+  const groups = layout(def, inFy);
+  const T = targets[key]||{};
+  const mk = (recsAll) => {
+    const ach = recsAll.filter(r=>released(r,P.fyS,P.end));
+    const last = recsAll.filter(r=>released(r,P.fyS,Math.min(P.cmp,P.end)));
+    const wk = recsAll.filter(r=>released(r,Math.max(P.cmp+1,P.fyS),P.end));
+    return {ach, last, wk, aP:ach.length, aF:sumTs(ach), lP:last.length, lF:sumTs(last), wP:wk.length, wF:sumTs(wk)};
+  };
+  const out = {def, groups:[], circle:null};
+  const circleRecs=[]; let cT=[0,0];
+  for (const g of groups){
+    const rows=[]; let gT=[0,0]; const gRecs=[];
+    for (const sd of g.sds){
+      const recs = base.filter(r=>r.div===g.div && r.sd===sd);
+      const t = T[sd]||[0,0];
+      rows.push({sd, t, ...mk(recs)});
+      gT[0]+=+t[0]||0; gT[1]+=+t[1]||0; gRecs.push(...recs);
+    }
+    out.groups.push({div:g.div, rows, total:{sd:(DIV_NAME[g.div]||g.div)+' Total', t:gT, ...mk(gRecs)}});
+    cT[0]+=gT[0]; cT[1]+=gT[1]; circleRecs.push(...gRecs);
+  }
+  out.circle = {sd:'Baroda-R Circle', t:cT, ...mk(circleRecs)};
+  return out;
+}
+
+/* =====================================================================
+   RENDERING — progress tables
+   ===================================================================== */
+const nf = new Intl.NumberFormat('en-IN');
+const fN = n => nf.format(Math.round(n));
+const fL = n => (Math.round(n*100)/100).toFixed(2);
+function pctCell(a,t){
+  if (!t) return '<td class="z">—</td>';
+  const p = a/t; const cls = p>=0.8?'pg':p>=0.5?'pw':'pb';
+  return `<td class="${cls}">${(p*100).toFixed(1)}%</td>`;
+}
+function numCell(n, recs, title, isFin){
+  const txt = isFin ? fL(n) : fN(n);
+  if (!recs || !recs.length) return `<td class="z">${txt}</td>`;
+  return `<td class="c" data-c="${cell(recs,title)}">${txt}</td>`;
+}
+function signCell(n, isFin){ const t = isFin?fL(n):fN(n); return `<td class="${n<0?'neg':''}">${n>0?'+':''}${t}</td>`; }
+function progRow(r, cls, P, title, schemeCell){
+  return `<tr class="${cls||''}">${schemeCell||''}<td class="l">${esc(r.sd)}</td>`+
+    `<td>${fN(r.t[0]||0)}</td><td>${fL(+r.t[1]||0)}</td>`+
+    numCell(r.aP, r.ach, `${title} · ${r.sd} · released ${fmtD(P.fyS)} to ${fmtD(P.end)}`) + `<td>${fL(r.aF)}</td>`+
+    pctCell(r.aP, +r.t[0]) + pctCell(r.aF, +r.t[1]) +
+    numCell(r.lP, r.last, `${title} · ${r.sd} · released up to ${fmtD(Math.min(P.cmp,P.end))}`) + `<td>${fL(r.lF)}</td>`+
+    numCell(r.wP, r.wk, `${title} · ${r.sd} · released ${fmtD(P.cmp+1)} to ${fmtD(P.end)}`) + `<td>${fL(r.wF)}</td></tr>`;
+}
+function renderProgress(key, P){
+  const R = computeReport(key, P), def = R.def;
+  let rowsN = R.groups.reduce((s,g)=>s+g.rows.length+1,0);
+  let h = `<div class="card"><div class="cardhead"><div><h2>${esc(def.title)} ${P.fyLbl} (As on ${fmtDot(P.asOn)})</h2>
+    <p class="note">Achievement = connections released (Date Of Release Conn) from ${fmtD(P.fyS)} to ${fmtD(P.end)}. Fin. = sum of TS Amount in ₹ lakh. Last weekly = position as on ${fmtD(Math.min(P.cmp,P.end))}. Click any underlined number to see the consumers.</p></div>
+    <div class="noprint"><button data-xl="t-${key}" data-xn="${esc(def.tab)}">Export Excel</button> <button onclick="window.print()">Print</button></div></div>
+    <div class="tblwrap"><table class="rep" id="t-${key}"><thead>
+    <tr><th rowspan="2">Scheme</th><th rowspan="2">Sub Division</th><th colspan="2">Target for ${P.fyLbl}</th><th colspan="2">Achievement</th><th colspan="2">% Achievement</th><th colspan="2">Achievement Last Weekly</th><th colspan="2">Progress This Week</th></tr>
+    <tr><th>Phy.</th><th>Fin. (Lakh)</th><th>Phy.</th><th>Fin. (Lakh)</th><th>Phy.</th><th>Fin.</th><th>Phy.</th><th>Fin. (Lakh)</th><th>Phy.</th><th>Fin. (Lakh)</th></tr></thead><tbody>`;
+  let first = true;
+  for (const g of R.groups){
+    g.rows.forEach((r,i)=>{
+      const sc = first ? `<td class="sch" rowspan="${rowsN}">${esc(def.scheme)}</td>` : '';
+      first=false;
+      h += progRow(r, '', P, def.scheme, sc);
+    });
+    h += progRow(g.total, 'divt', P, def.scheme, '');
+  }
+  h += progRow(R.circle, 'circ', P, def.scheme, `<td class="sch" style="background:var(--circle-row);color:var(--circle-ink)"></td>`);
+  h += `</tbody></table></div>`;
+  // weekly progress summary (Excel bottom block)
+  h += `<h2 style="margin-top:16px">Weekly Progress (${fmtD(P.cmp+1)} to ${fmtD(P.end)})</h2><div class="tblwrap" style="max-width:520px"><table class="rep"><thead><tr><th>Division</th><th>Phy.</th><th>Fin. (Lakh)</th></tr></thead><tbody>`;
+  for (const g of R.groups) h += `<tr><td class="l">${esc(DIV_NAME[g.div]||g.div)}</td>${numCell(g.total.wP,g.total.wk,def.scheme+' · '+(DIV_NAME[g.div]||g.div)+' · released this week')}<td>${fL(g.total.wF)}</td></tr>`;
+  h += `<tr class="circ"><td class="l">BOM Circle</td>${numCell(R.circle.wP,R.circle.wk,def.scheme+' · Circle · released this week')}<td>${fL(R.circle.wF)}</td></tr></tbody></table></div></div>`;
+  $('p-'+key).innerHTML = h;
+  return R;
+}
+
+/* =====================================================================
+   PAID PENDING
+   ===================================================================== */
+function ppMonths(P){
+  const endK = monKey(P.asOn);
+  let startK;
+  const m = /^(\d{4})-(\d{2})$/.exec(settings.ppStart||'');
+  startK = m ? (+m[1])*12 + (+m[2]-1) : endK-9;
+  if (startK>endK) startK=endK;
+  const ks=[]; for (let k=startK;k<=endK;k++) ks.push(k);
+  return {startK, ks};
+}
+const bucketOf = (r, startK) => { const k=monKey(r.paid); return k<startK ? 'E' : k; };
+function ppLayout(recs){
+  return layout({groups:[['BARODA',DIVS.BARODA],['JAMBUVA',DIVS.JAMBUVA],['DABHOI',DIVS.DABHOI.filter(s=>s!=='DABHOI T')],['BODELI',DIVS.BODELI.filter(s=>!/-II$/.test(s))]]}, recs);
+}
+function renderPP(P){
+  const cur = S.recs.filter(r=>isPP(r,P.asOn,P));
+  const last = S.recs.filter(r=>isPP(r,P.cmp,P));
+  const {startK, ks} = ppMonths(P);
+  const cols = ['E', ...ks];
+  const colLbl = c => c==='E' ? 'Up to '+monLbl(startK-1) : monLbl(c);
+  const groups = ppLayout(cur);
+  const by = (arr) => { const o={}; for (const c of cols) o[c]=[]; for (const r of arr) o[bucketOf(r,startK)].push(r); return o; };
+  const defTxt = P.ppDef==='release' ? 'FQ paid but connection not released' : 'FQ paid but TMN / WCC not yet issued';
+  const rowsN = groups.reduce((s,g)=>s+g.sds.length+1,0);
+  let h = `<div class="card"><div class="cardhead"><div><h2>Paid Pending Applications: Ag Wells (As on ${fmtDot(P.asOn)})</h2>
+  <p class="note">Paid pending = ${defTxt}. Columns are the month of FQ payment. Schemes: ${P.ppSch==='ts'?'TASP + SPA (incl. DZ)':'all schemes'}. Change the first month under Targets &amp; Settings.</p></div>
+  <div class="noprint"><button data-xl="t-pp" data-xn="PP MOnthwise SDN">Export Excel</button> <button onclick="window.print()">Print</button></div></div>
+  <div class="tblwrap"><table class="rep" id="t-pp"><thead><tr><th rowspan="2">Scheme</th><th rowspan="2">Sub Division</th><th colspan="${cols.length}">Month of Paid Pending (FQ paid month)</th><th rowspan="2">Total</th></tr><tr>${cols.map(c=>`<th>${colLbl(c)}</th>`).join('')}</tr></thead><tbody>`;
+  const line = (label, arr, cls, sc) => { const b=by(arr); return `<tr class="${cls||''}">${sc||''}<td class="l">${esc(label)}</td>${cols.map(c=>numCell(b[c].length,b[c],`Paid pending · ${label} · paid ${colLbl(c)}`)).join('')}${numCell(arr.length,arr,'Paid pending · '+label)}</tr>`; };
+  let first=true;
+  for (const g of groups){
+    const gArr=[];
+    for (const sd of g.sds){
+      const arr = cur.filter(r=>r.div===g.div && r.sd===sd); gArr.push(...arr);
+      h += line(sd, arr, '', first?`<td class="sch" rowspan="${rowsN}">TASP + SPA Scheme + DZ Scheme</td>`:''); first=false;
+    }
+    h += line((DIV_NAME[g.div]||g.div).toUpperCase()+' TOTAL', gArr, 'divt');
+  }
+  h += `<tr class="circ"><td class="l" colspan="2">Baroda-R Circle Total</td>${(()=>{const b=by(cur);return cols.map(c=>numCell(b[c].length,b[c],'Paid pending · Circle · paid '+colLbl(c))).join('')+numCell(cur.length,cur,'Paid pending · Circle');})()}</tr>`;
+  const bl = by(last), bc = by(cur);
+  h += `<tr class="wk"><td class="l" colspan="2">PP as on Last Weekly (${fmtD(P.cmp)})</td>${cols.map(c=>numCell(bl[c].length,bl[c],'Paid pending as on '+fmtD(P.cmp)+' · paid '+colLbl(c))).join('')}${numCell(last.length,last,'Paid pending as on '+fmtD(P.cmp))}</tr>`;
+  h += `<tr class="wk"><td class="l" colspan="2">Progress This Week (last weekly − now)</td>${cols.map(c=>signCell(bl[c].length-bc[c].length)).join('')}${signCell(last.length-cur.length)}</tr>`;
+  h += `</tbody></table></div></div>`;
+  $('p-pp').innerHTML = h;
+  return {cur, last, cols, colLbl, startK};
+}
+function renderCat(P, PP){
+  const {cur, cols, colLbl} = PP;
+  const hasO = cur.some(r=>!r.cat || r.cat==='A');
+  const cats = hasO ? ['B','C','D','O'] : ['B','C','D'];
+  const catLbl = c => c==='O' ? 'A/Oth' : c;
+  const ck = r => (r.cat==='B'||r.cat==='C'||r.cat==='D') ? r.cat : 'O';
+  const groups = ppLayout(cur);
+  const allCols = [...cols, 'T'];
+  let h = `<div class="card"><div class="cardhead"><div><h2>Sub Division wise Monthwise Categorywise Paid Pending (As on ${fmtDot(P.asOn)})</h2>
+  <p class="note">Category = Survey Category of the application. "A/Oth" covers category A and blanks. T = total of the month.</p></div>
+  <div class="noprint"><button data-xl="t-cat" data-xn="CAT Wise Paid Pending">Export Excel</button> <button onclick="window.print()">Print</button></div></div>
+  <div class="tblwrap"><table class="rep" id="t-cat"><thead><tr><th rowspan="2">Sr. No.</th><th rowspan="2">Division</th><th rowspan="2">Sub Division</th>${allCols.map(c=>`<th class="mon" colspan="${cats.length+1}">${c==='T'?'Total':colLbl(c)}</th>`).join('')}</tr>
+  <tr>${allCols.map(c=>cats.map((k,i)=>`<th class="${i===0?'mon':''}">${catLbl(k)}</th>`).join('')+`<th>${c==='T'?'TOTAL':'T'}</th>`).join('')}</tr></thead><tbody>`;
+  const cellsFor = (arr, label) => {
+    const o={}; for (const c of allCols){ o[c]={T:[]}; for (const k of cats) o[c][k]=[]; }
+    for (const r of arr){ const b=bucketOf(r,PP.startK), k=ck(r); o[b][k].push(r); o[b].T.push(r); o.T[k].push(r); o.T.T.push(r); }
+    return allCols.map(c=>cats.map((k,i)=>numCell(o[c][k].length,o[c][k],`Paid pending · ${label} · ${c==='T'?'all months':colLbl(c)} · Cat ${catLbl(k)}`).replace('<td class="','<td class="'+(i===0?'mon ':''))).join('')+numCell(o[c].T.length,o[c].T,`Paid pending · ${label} · ${c==='T'?'all months':colLbl(c)}`)).join('');
+  };
+  let sr=0;
+  for (const g of groups){
+    sr++; const gArr=[]; const dn = DIV_NAME[g.div]||g.div;
+    g.sds.forEach((sd,i)=>{
+      const arr = cur.filter(r=>r.div===g.div && r.sd===sd); gArr.push(...arr);
+      h += `<tr>${i===0?`<td rowspan="${g.sds.length}" style="text-align:center">${sr}</td><td class="sch" rowspan="${g.sds.length}">${esc(dn)}</td>`:''}<td class="l">${esc(sd)}</td>${cellsFor(arr, sd)}</tr>`;
+    });
+    h += `<tr class="divt"><td class="l" colspan="2">${esc(dn)}</td><td class="l">TOTAL</td>${cellsFor(gArr, dn+' total')}</tr>`;
+  }
+  h += `<tr class="circ"><td class="l" colspan="2">CIRCLE TOTAL</td><td class="l">BARODA O&amp;M</td>${cellsFor(cur,'Circle')}</tr></tbody></table></div></div>`;
+  $('p-cat').innerHTML = h;
+}
+
+/* =====================================================================
+   WC STATUS (List sheet) — replicates "Pivot Table 1"
+   ===================================================================== */
+function renderWC(){
+  if (!S.list.length){ $('p-wc').innerHTML = `<div class="card"><div class="empty">The "List" sheet was not found in the loaded data. If it is a separate tab, add its link as the second link under Targets &amp; Settings.</div></div>`; return; }
+  const norm = s => { s=String(s||'').trim(); if (!s||s==='NULL') return '(blank)'; return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); };
+  const order = ['(blank)','Crop','Objection','Pole required','Pole carted','Pole erected','Wc'];
+  const st = [...new Set(S.list.map(r=>norm(r.wcs)))].sort((a,b)=>{const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?50:ia)-(ib<0?50:ib)||a.localeCompare(b);});
+  const lbl = s => s==='Wc'?'WC':s;
+  const groups = layout({groups:[]}, S.list);
+  let h = `<div class="card"><div class="cardhead"><div><h2>Work Status of Paid Pending Applications (List sheet)</h2><p class="note">Count of consumers by WC Status, same as "Pivot Table 1". Click a number to see the consumers.</p></div>
+  <div class="noprint"><button data-xl="t-wc" data-xn="WC Status">Export Excel</button> <button onclick="window.print()">Print</button></div></div>
+  <div class="tblwrap"><table class="rep" id="t-wc"><thead><tr><th>Division</th><th>Sub Division</th>${st.map(s=>`<th>${esc(lbl(s))}</th>`).join('')}<th>Grand Total</th></tr></thead><tbody>`;
+  const line = (arr, label) => { const o={}; st.forEach(s=>o[s]=[]); arr.forEach(r=>o[norm(r.wcs)].push(r)); return st.map(s=>numCell(o[s].length,o[s],`WC status · ${label} · ${lbl(s)}`)).join('')+numCell(arr.length,arr,'WC status · '+label); };
+  for (const g of groups){
+    const dn = DIV_NAME[g.div]||g.div, gArr=[];
+    g.sds.forEach((sd,i)=>{ const arr=S.list.filter(r=>r.div===g.div&&r.sd===sd); gArr.push(...arr); h+=`<tr>${i===0?`<td class="sch" rowspan="${g.sds.length}">${esc(dn)}</td>`:''}<td class="l">${esc(sd)}</td>${line(arr,sd)}</tr>`; });
+    h += `<tr class="divt"><td class="l" colspan="2">${esc(dn)} Total</td>${line(gArr, dn)}</tr>`;
+  }
+  h += `<tr class="circ"><td class="l" colspan="2">Grand Total</td>${line(S.list,'Circle')}</tr></tbody></table></div></div>`;
+  $('p-wc').innerHTML = h;
+}
+
+/* =====================================================================
+   OVERVIEW
+   ===================================================================== */
+const charts = {};
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function mkChart(id, cfg){
+  if (charts[id]) charts[id].destroy();
+  const el = $(id); if (!el || typeof Chart==='undefined') return;
+  Chart.defaults.color = css('--text-2'); Chart.defaults.font.family = getComputedStyle(document.body).fontFamily; Chart.defaults.font.size = 12;
+  charts[id] = new Chart(el, cfg);
+}
+function renderOverview(P, reps, PP){
+  const t = reps.tasp.circle, s = reps.spadz.circle;
+  const relFy = S.recs.filter(r=>released(r,P.fyS,P.end));
+  const relWk = S.recs.filter(r=>released(r,Math.max(P.cmp+1,P.fyS),P.end));
+  const pct = (a,b) => b ? (a/b*100).toFixed(1)+'% of target '+fN(b) : 'no target set';
+  const ppDelta = PP.cur.length - PP.last.length;
+  const tile = (k,v,d,recs,title) => `<div class="tile"><div class="k">${k}</div><div class="v">${recs?`<span class="c" style="cursor:pointer" data-c="${cell(recs,title)}">${v}</span>`:v}</div><div class="d">${d}</div></div>`;
+  let h = `<div class="tiles">
+    ${tile('TASP released '+P.fyLbl, fN(t.aP), pct(t.aP,t.t[0]), t.ach, 'TASP · released in '+P.fyLbl)}
+    ${tile('SPA + DZ released '+P.fyLbl, fN(s.aP), pct(s.aP,s.t[0]), s.ach, 'SPA + DZ · released in '+P.fyLbl)}
+    ${tile('All Ag released '+P.fyLbl, fN(relFy.length), '₹ '+fL(sumTs(relFy))+' lakh TS value', relFy, 'All schemes · released in '+P.fyLbl)}
+    ${tile('Released this week', fN(relWk.length), fmtD(P.cmp+1)+' to '+fmtD(P.end), relWk, 'Released '+fmtD(P.cmp+1)+' to '+fmtD(P.end))}
+    ${tile('Paid pending now', fN(PP.cur.length), (ppDelta<=0?'▼ ':'▲ ')+fN(Math.abs(ppDelta))+' vs '+fmtD(P.cmp), PP.cur, 'Paid pending as on '+fmtD(P.asOn))}
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="cardhead"><div><h2>Achievement vs target by sub division</h2><p class="note">Physical, ${P.fyLbl}</p></div>
+      <select id="ovRep" class="noprint"><option value="tasp">TASP</option><option value="spadz">SPA + DZ</option><option value="spa">SPA</option><option value="dz">DZ</option></select></div>
+      <div class="chartbox tall"><canvas id="cAch"></canvas></div>
+      <div class="legendrow"><span style="--sw:var(--s1)">Achieved</span><span style="--sw:var(--neutral)">Target</span></div></div>
+    <div class="card"><h2>Connections released per month</h2><p class="note">${P.fyLbl}, by scheme</p>
+      <div class="chartbox"><canvas id="cMon"></canvas></div>
+      <div class="legendrow"><span style="--sw:var(--s1)">TASP</span><span style="--sw:var(--s2)">SPA + DZ</span></div>
+      <h2 style="margin-top:18px">Paid pending — how long since FQ payment</h2><p class="note">Applications pending as on ${fmtD(P.asOn)}, by days since FQ paid</p>
+      <div class="chartbox" style="height:220px"><canvas id="cAge"></canvas></div></div>
+  </div>`;
+  $('p-ov').innerHTML = h;
+  const repSel = $('ovRep'); repSel.value = settings.ovRep || 'tasp';
+  const drawAch = () => {
+    const R = reps[repSel.value]; const rows=[]; R.groups.forEach(g=>g.rows.forEach(r=>{ if (r.aP || +r.t[0]) rows.push(r); }));
+    mkChart('cAch', {type:'bar', data:{labels:rows.map(r=>r.sd), datasets:[
+      {label:'Achieved', data:rows.map(r=>r.aP), backgroundColor:css('--s1'), borderRadius:4, barPercentage:.9, categoryPercentage:.7, borderColor:css('--surface'), borderWidth:{right:0,top:0,bottom:0,left:0}},
+      {label:'Target', data:rows.map(r=>+r.t[0]||0), backgroundColor:css('--neutral'), borderRadius:4, barPercentage:.9, categoryPercentage:.7}]},
+      options:{indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{afterBody:(it)=>{const r=rows[it[0].dataIndex]; return +r.t[0] ? 'Achievement: '+(r.aP/r.t[0]*100).toFixed(1)+'%' : '';}}}},
+      scales:{x:{grid:{color:css('--grid')}, beginAtZero:true}, y:{grid:{display:false}}}}});
+  };
+  repSel.onchange = () => { settings.ovRep = repSel.value; save(LS_SET, settings); drawAch(); };
+  drawAch();
+  // monthly releases in FY
+  const months=[]; for (let k=monKey(P.fyS); k<=monKey(P.end); k++) months.push(k);
+  const cnt = sch => months.map(k=>relFy.filter(r=>r.sch===sch && monKey(r.rel)===k).length);
+  mkChart('cMon', {type:'bar', data:{labels:months.map(monLbl), datasets:[
+    {label:'TASP', data:cnt('TASP'), backgroundColor:css('--s1'), borderColor:css('--surface'), borderWidth:{top:2}, borderSkipped:'bottom', borderRadius:{topLeft:4,topRight:4}},
+    {label:'SPA + DZ', data:cnt('SPA'), backgroundColor:css('--s2'), borderColor:css('--surface'), borderWidth:{top:2}, borderSkipped:'bottom', borderRadius:{topLeft:4,topRight:4}}]},
+    options:{maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{display:false}}, scales:{x:{stacked:true,grid:{display:false}}, y:{stacked:true, beginAtZero:true, grid:{color:css('--grid')}}}}});
+  // ageing
+  const B = [[0,30,'0–30 days'],[31,60,'31–60'],[61,90,'61–90'],[91,180,'91–180'],[181,365,'181–365'],[366,1e9,'> 1 year']];
+  const ag = B.map(([a,b])=>PP.cur.filter(r=>{const d=P.asOn-r.paid; return d>=a&&d<=b;}).length);
+  mkChart('cAge', {type:'bar', data:{labels:B.map(b=>b[2]), datasets:[{label:'Applications', data:ag, backgroundColor:css('--s1'), borderRadius:4, barPercentage:.7}]},
+    options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:css('--grid')}}}}});
+}
+
+/* =====================================================================
+   SETTINGS & TARGETS
+   ===================================================================== */
+function renderSettings(){
+  let h = `<div class="card"><h2>Data source</h2><p class="note">The dashboard downloads the whole Google Sheet (all tabs) and finds the "GPR All" and "List" tabs by their column headings. The sheet must be shared as <b>Anyone with the link → Viewer</b> (or published to the web).</p>
+    <div class="row"><label>Google Sheet link<input type="text" id="sLink" value="${esc(settings.link)}"></label></div>
+    <div class="row"><label>Second link (optional — only if the List tab is in a different file or the full download fails)<input type="text" id="sLink2" value="${esc(settings.link2)}"></label></div>
+    <div class="row"><label>Paid pending: first month column<input type="month" id="sPpStart" value="${esc(settings.ppStart)}"></label>
+    <div class="hint" style="align-self:flex-end">Blank = last 10 months. Older pending goes into an "Up to …" column.</div></div>
+    <button class="primary" id="sSave">Save &amp; reload data</button></div>
+  <div class="card"><div class="cardhead"><div><h2>Targets</h2><p class="note">Defaults are copied from AG_Progress_Dashboard.xlsm. Edits are saved in this browser. Fin. in ₹ lakh.</p></div>
+    <div><button id="tExp">Export targets</button> <button id="tImp">Import targets</button> <button id="tReset">Reset to Excel defaults</button><input type="file" id="tFile" accept=".json" hidden></div></div>
+    <div class="grid2">`;
+  for (const key in REPORTS){
+    const def = REPORTS[key]; const groups = layout(def, []);
+    h += `<div><h2 style="font-size:14px">${esc(def.scheme)}</h2><div class="tblwrap"><table class="rep tgt"><thead><tr><th>Division</th><th>Sub Division</th><th>Phy.</th><th>Fin. (Lakh)</th></tr></thead><tbody>`;
+    for (const g of groups) g.sds.forEach((sd,i)=>{ const t=(targets[key]||{})[sd]||['','']; h+=`<tr>${i===0?`<td class="sch" rowspan="${g.sds.length}">${esc(DIV_NAME[g.div])}</td>`:''}<td class="l">${esc(sd)}</td><td><input type="number" min="0" step="1" data-k="${key}" data-s="${esc(sd)}" data-i="0" value="${t[0]===''?'':t[0]}"></td><td><input type="number" min="0" step="0.01" data-k="${key}" data-s="${esc(sd)}" data-i="1" value="${t[1]===''?'':Math.round(t[1]*100)/100}"></td></tr>`; });
+    h += `</tbody></table></div></div>`;
+  }
+  h += `</div></div>`;
+  $('p-set').innerHTML = h;
+  $('sSave').onclick = () => { settings.link=$('sLink').value.trim(); settings.link2=$('sLink2').value.trim(); settings.ppStart=$('sPpStart').value; save(LS_SET, settings); loadFromGoogle(); };
+  $('sPpStart').onchange = () => { settings.ppStart=$('sPpStart').value; save(LS_SET, settings); if (S.recs.length) renderAll(true); };
+  $('p-set').querySelectorAll('input[data-k]').forEach(inp => inp.onchange = () => {
+    const k=inp.dataset.k, s=inp.dataset.s, i=+inp.dataset.i; targets[k]=targets[k]||{}; const t=targets[k][s]||[0,0];
+    t[i] = parseFloat(inp.value)||0; targets[k][s]=t; save(LS_TGT, targets); if (S.recs.length) renderAll(true);
+  });
+  $('tReset').onclick = () => { if (!confirm('Replace all targets with the values from the Excel file?')) return; targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS)); save(LS_TGT, targets); renderSettings(); if (S.recs.length) renderAll(true); };
+  $('tExp').onclick = () => download('BOM_RE_targets.json', JSON.stringify(targets,null,1), 'application/json');
+  $('tImp').onclick = () => $('tFile').click();
+  $('tFile').onchange = async e => { try{ const t=JSON.parse(await e.target.files[0].text()); targets=t; for (const k in DEFAULT_TARGETS) targets[k]=targets[k]||{}; save(LS_TGT,targets); renderSettings(); if (S.recs.length) renderAll(true);}catch(err){ alert('Invalid targets file'); } };
+}
+
+/* =====================================================================
+   DRILL-DOWN MODAL, EXPORT
+   ===================================================================== */
+let mRecs=[], mTitle='';
+function openCell(i){
+  const c = CELLS[i]; if (!c) return;
+  mRecs = c.recs; mTitle = c.title;
+  $('mTitle').textContent = c.title + ' — ' + fN(c.recs.length) + ' consumers';
+  $('mSearch').value=''; drawModal(); $('modal').classList.add('on');
+}
+const MCOLS = [['SR No','sr'],['Consumer','name'],['Village','village'],['Sub Division','sdRaw'],['Scheme','schRaw'],['Cat','cat'],['TS Amount (₹)','ts'],['FQ Paid','paid'],['TMN','tmn'],['Release','rel'],['WC Status','wcs']];
+function mVal(r,k){ return ['paid','tmn','rel'].includes(k) ? fmtD(r[k]) : k==='ts' ? (r.ts?fN(r.ts):'') : (r[k]==null?'':r[k]); }
+function drawModal(){
+  const q = $('mSearch').value.trim().toLowerCase();
+  const cols = MCOLS.filter(([,k]) => k!=='wcs' || mRecs.some(r=>r.wcs));
+  const arr = q ? mRecs.filter(r=>(r.sr+' '+r.name+' '+r.village+' '+r.sdRaw).toLowerCase().includes(q)) : mRecs;
+  const sorted = [...arr].sort((a,b)=>(a.sdRaw||'').localeCompare(b.sdRaw||'') || (a.paid||0)-(b.paid||0));
+  const lim = sorted.slice(0,3000);
+  $('mBody').innerHTML = `<table class="rep"><thead><tr><th>#</th>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${lim.map((r,i)=>`<tr><td class="r">${i+1}</td>${cols.map(([,k])=>`<td class="${k==='ts'?'r':''}">${esc(mVal(r,k))}</td>`).join('')}</tr>`).join('')}</tbody></table>${sorted.length>3000?`<p class="hint" style="padding:8px">Showing first 3,000 of ${fN(sorted.length)} — download CSV for all.</p>`:''}`;
+}
+function download(name, content, type){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},500);
+}
+$('mClose').onclick = () => $('modal').classList.remove('on');
+$('modal').onclick = e => { if (e.target.id==='modal') $('modal').classList.remove('on'); };
+document.addEventListener('keydown', e => { if (e.key==='Escape') $('modal').classList.remove('on'); });
+$('mSearch').oninput = drawModal;
+$('mCsv').onclick = () => {
+  const cols = MCOLS.filter(([,k]) => k!=='wcs' || mRecs.some(r=>r.wcs));
+  const q = v => { v=String(v??''); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const lines = [cols.map(c=>c[0]).join(',')].concat(mRecs.map(r=>cols.map(([,k])=>q(k==='ts'?r.ts:mVal(r,k))).join(',')));
+  download(mTitle.replace(/[^\w\- ]+/g,'_').slice(0,80)+'.csv', '﻿'+lines.join('\r\n'), 'text/csv');
+};
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-c]'); if (c){ openCell(+c.dataset.c); return; }
+  const x = e.target.closest('[data-xl]');
+  if (x){
+    if (typeof XLSX==='undefined'){ alert('Excel export needs internet (SheetJS library).'); return; }
+    const wb = XLSX.utils.table_to_book($(x.dataset.xl), {sheet:x.dataset.xn.slice(0,31), raw:true});
+    XLSX.writeFile(wb, 'BOM_RE_'+x.dataset.xn.replace(/[^\w]+/g,'_')+'_'+$('asOn').value+'.xlsx');
+  }
+});
+
+/* =====================================================================
+   MAIN RENDER
+   ===================================================================== */
+function renderAll(keepSettings){
+  if (!S.recs.length) return;
+  CELLS.length = 0;
+  const P = params();
+  $('asOnLbl').textContent = P.fyLbl + ' · As on ' + fmtD(P.asOn) + ' · compared with ' + fmtD(P.cmp);
+  $('srcLbl').textContent = S.source;
+  const reps = {};
+  for (const k in REPORTS) reps[k] = renderProgress(k, P);
+  const PP = renderPP(P);
+  renderCat(P, PP);
+  renderWC();
+  renderOverview(P, reps, PP);
+  if (!keepSettings) renderSettings();
+}
+$('tabs').onclick = e => {
+  const b = e.target.closest('button[data-t]'); if (!b) return;
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on', x===b));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on', p.id==='p-'+b.dataset.t));
+  try{ sessionStorage.setItem('bomre_tab', b.dataset.t); }catch(err){}
+};
+['fySel','asOn','cmpOn','ppDef','ppSch'].forEach(id => $(id).addEventListener('change', () => {
+  if (id==='asOn'){ const a=fromIso($('asOn').value); if (a!=null) $('cmpOn').value = isoD(a-7); }
+  settings.ppDef=$('ppDef').value; settings.ppSch=$('ppSch').value; save(LS_SET, settings);
+  renderAll(true);
+}));
+$('btnRefresh').onclick = loadFromGoogle;
+$('btnFile').onclick = () => $('fileIn').click();
+$('fileIn').onchange = e => { const f = Array.from(e.target.files); e.target.value=''; if (f.length) loadFiles(f); };
+if (settings.ppDef) $('ppDef').value = settings.ppDef;
+if (settings.ppSch) $('ppSch').value = settings.ppSch;
+try{ const t=sessionStorage.getItem('bomre_tab'); if (t){ const b=document.querySelector(`#tabs button[data-t="${t}"]`); if (b) b.click(); } }catch(err){}
+renderSettings();
+if (typeof XLSX==='undefined') setStatus('Could not load the SheetJS library — check internet connection.', true);
+else loadFromGoogle();
+</script>
+</body>
+</html>
